@@ -1,0 +1,116 @@
+---
+title: "Predicting the brexit vote: Tree-based method"
+author: ""
+date: "25/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+- Use the same data from #1 but estimate tree based model.
+
+## Libraries
+
+- We will use the following packages
+
+```{r}
+library(tidyverse)
+library(caret)
+library(tree)
+```
+
+## Load data
+
+We sub-sample the data. Full data takes too much time to estimate for the class... (Feel free to run full sample after the class)
+
+```{r}
+set.seed(20200813)
+data_brexit <- read_csv("data/data_bes.csv.gz") %>%
+  sample_n(3000) # sampling data so
+```
+
+
+## Data preparation
+
+- We will carry out:
+  - make `LeaveVote` factor variable
+  - test train split
+  - preprocess
+
+
+```{r}
+data_brexit <- data_brexit %>%
+    mutate(LeaveVote = factor(LeaveVote))
+```
+
+### Train-test split
+
+```{r}
+train_idx <- createDataPartition(data_brexit$LeaveVote, p = .7, list = F) 
+
+data_train <- data_brexit %>% slice(train_idx)
+data_test <- data_brexit %>% slice(-train_idx)
+```
+
+### Preprocess
+
+```{r}
+prep <- preProcess(data_train %>% select(-LeaveVote), method = c("center", "scale"))
+prep
+
+data_train_preped <- predict(prep, data_train)
+data_test_preped <- predict(prep, data_test)
+
+```
+
+## Model formulas
+
+There are four logistic regression models  in the manuscript (Table 2).
+
+1. Sociodemographics
+2. Identity
+3. Anti-elite
+4. Attitudes
+
+The following line of codes will generate the each model. 
+
+```{r}
+fm_socdem <- formula("LeaveVote ~ gender + age + edlevel + hhincome + econPersonalRetro1")
+fm_identity <- formula("LeaveVote ~ gender + age + edlevel + hhincome + 
+                        EuropeanIdentity + EnglishIdentity + BritishIdentity")
+fm_antielite <- formula("LeaveVote ~ gender + age + edlevel + hhincome + 
+              PolMistrust + GovDisapproval + PopulismScale + 
+              ConVote + LabVote + LibVote + SNPPCVote + UKIP")
+fm_attitudes <- formula("LeaveVote ~ gender + age + edlevel + hhincome + euUKNotRich + 
+              euNotPreventWar + FreeTradeBad + euParlOverRide1 + euUndermineIdentity1 + 
+              lessEUmigrants + effectsEUTrade1 + effectsEUImmigrationLower")
+fm_all <- formula("LeaveVote ~ .")
+
+```
+
+
+## Simple tree method
+
+- Estimate a simple classification tree, using one of the formula above. 
+- Draw tree
+- Evaluate the model
+- What do you find?
+
+```{r eval = F}
+
+```
+
+## Randowm forest regression and adaBoost
+
+- Now, run "forest" models
+- Any improvement of the prediction?
+- For random forest training, use `tuneGrid = data.frame(mtry = c(2:4))`. Otherwise it's too slow...
+
+```{r cache=T}
+
+```
+
