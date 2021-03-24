@@ -1,0 +1,119 @@
+---
+title: "Sparklyr demo"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Motivation
+
+- In this demo 
+  1. we will install 
+    - sparklyr
+    - Apache spark (through sparklyr)
+  2. Run some basic codes
+  
+Codes are pretty similar to what we did for `dbplyr`. 
+
+The main difference is we can run the model on the cluster.
+
+## Installation
+
+
+### Installation of `sparklyr`
+```{r}
+system('java -version') # the default version of java on this server matches
+install.packages("sparklyr") # install package
+```
+
+### Install and connect to Apache Spark
+
+```{r}
+library(sparklyr)
+library(tidyverse)
+spark_install("2.3")
+spark_installed_versions()
+
+## Connect
+sc <- spark_connect(master = "local", version = "2.3")
+```
+
+### Put the data on spark
+
+```{r}
+spark_covid <- spark_read_csv(
+  sc, 
+  "data/covid-data-all.csv.gz",
+  escape = '"',
+  memory = T)
+
+head(spark_covid)
+glimpse(spark_covid)
+
+spark_covid_latest <- spark_covid %>% filter(date == "2020-08-08") 
+```
+
+### create data partition
+
+For data partition, we use `sdf_random_split()` 
+
+```{r}
+data_splits <- 
+  spark_covid_latest %>%
+  sdf_random_split(training = .8, testing = .2,
+                                seed = 42)
+spark_covid_train <- data_splits$training
+spark_covid_test <- data_splits$testing
+```
+
+
+### Visualisation 
+
+- You can use ggplot after bringing data to R. But this could be quite costly. You can use `dbplot` package for a limited types of plotting.
+
+```{r}
+install.packages("dbplot")
+library(dbplot)
+
+dbplot_histogram(spark_covid_test, deaths_per1000) + 
+  theme_minimal()
+```
+
+### Run models and evaluate
+
+- Now we work with Sparks `MLlib` through `ml_*` function
+
+#### Model fitting
+
+```{r}
+install.packages("tictoc")
+tictoc::tic()
+model_lm <- spark_covid_train %>% 
+  ml_linear_regression(deaths_per1000 ~ Black + Hispanic + pct + Unemployment)
+tictoc::toc()
+ml_evaluate(model_lm, spark_covid_train)$mean_squared_error
+```
+
+#### Calculate MSE
+
+```{r}
+
+ml_predict(model_ml, spark_covid_test) %>%
+mutate(resid = deaths_per1000 - prediction) %>%
+summarize(mse = mean(resid ^ 2)) %>%
+collect()
+
+# or simply
+
+ml_evaluate(model_lm, spark_covid_test)$mean_squared_error
+
+```
+
+
+### Example of other methods
+
+- `ml_logistic_regression()`
+- `ml_random_forest()`
+- `ml_gradient_boosted_trees()`
